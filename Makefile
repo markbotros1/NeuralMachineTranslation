@@ -80,7 +80,8 @@ test_environment:
 # PROJECT RULES                                                                 #
 #################################################################################
 
-
+train: 
+	$(PYTHON_INTERPRETER) src/model/train_model.py
 
 #################################################################################
 # Self Documenting Commands                                                     #
