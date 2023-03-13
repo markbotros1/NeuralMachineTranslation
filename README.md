@@ -29,4 +29,6 @@ Project Organization
     │   │   ├── decoder.py
     │   │   ├── nmt.py
     │   │   ├── train_helpers.py
-    │   │   └── train_model.py
+    │   │   ├── train_model.py
+    │   │   └── predict_model.py
+            
