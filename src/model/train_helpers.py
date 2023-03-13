@@ -1,11 +1,11 @@
 import math
 import time
-import tqdm
 import numpy as np
 import torch
 from typing import List
-from nmt import Hypothesis
+from tqdm import tqdm
 from nltk.translate.bleu_score import corpus_bleu
+from nmt import Hypothesis
 
 def batch_iter(data, batch_size, shuffle=False):
     """ Yield batches of source and target sentences reverse sorted by length (largest to smallest).

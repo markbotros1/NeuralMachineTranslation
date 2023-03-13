@@ -2,10 +2,10 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from encoder import Encoder, generate_sent_masks
-from decoder import Decoder
 from typing import List, Tuple
 from collections import namedtuple
+from encoder import Encoder, generate_sent_masks
+from decoder import Decoder
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 
@@ -14,11 +14,8 @@ class NMT(nn.Module):
         - Bidrectional RNN Encoder
         - Unidirection RNN Decoder
     """
-    
-    # def __init__(self, embed_size, hidden_size, src_vocab, tgt_vocab,
-    #              device=torch.device("cpu"), pretrained_source=None,pretrained_target=None):
     def __init__(self, embed_size, hidden_size, src_vocab, tgt_vocab, d_rate,
-                 device=torch.device("cpu"), pretrained_source=None,pretrained_target=None): ## Mod B
+                 device=torch.device("cpu"), pretrained_source=None,pretrained_target=None):
         """ Init NMT Model.
 
         :param embed_size: Embedding size (dimensionality)
@@ -41,7 +38,7 @@ class NMT(nn.Module):
         self.embed_size = embed_size
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
-        self.d_rate = d_rate ## Mod B
+        self.d_rate = d_rate
         src_pad_token_idx = src_vocab['<pad>']
         tgt_pad_token_idx = tgt_vocab['<pad>']
         self.source_embedding = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_pad_token_idx)
@@ -51,12 +48,12 @@ class NMT(nn.Module):
             if pretrained_source is not None:
                 self.source_embedding.weight.data = pretrained_source
                 # TODO: Decide if we want the embeddings to update as we train
-                self.source_embedding.weight.requires_grad = True ## Mod A
+                self.source_embedding.weight.requires_grad = True
         
             if pretrained_target is not None:
                 self.target_embedding.weight.data = pretrained_target
                 # TODO: Decide if we want the embeddings to update as we train
-                self.target_embedding.weight.requires_grad = True ## Mod A
+                self.target_embedding.weight.requires_grad = True
         
         self.hidden_size = hidden_size
 
@@ -70,7 +67,7 @@ class NMT(nn.Module):
             hidden_size=hidden_size,
             target_embedding=self.target_embedding,
             device=self.device,            
-            d_rate = self.d_rate ## Mod B
+            d_rate = self.d_rate
         )
 
 
@@ -103,8 +100,7 @@ class NMT(nn.Module):
 
         enc_hiddens, dec_init_state = self.encode(source_padded, source_lengths)
         enc_masks = generate_sent_masks(enc_hiddens, source_lengths, self.device)
-        # combined_outputs = self.decode(enc_hiddens, dec_init_state, target_padded)
-        combined_outputs = self.decode(enc_hiddens, enc_masks, dec_init_state, target_padded) ## Mod B
+        combined_outputs = self.decode(enc_hiddens, enc_masks, dec_init_state, target_padded)
         P = F.log_softmax(self.decoder.target_vocab_projection(combined_outputs), dim=-1)
 
         # Zero out, probabilities for which we have nothing in the target text
@@ -133,10 +129,8 @@ class NMT(nn.Module):
         """
         return self.encoder(source_padded, source_lengths)
 
-    # def decode(self, enc_hiddens: torch.Tensor, dec_init_state: torch.Tensor,
-    #            target_padded: torch.Tensor) -> torch.Tensor:
     def decode(self, enc_hiddens: torch.Tensor, enc_masks: torch.Tensor,
-               dec_init_state: torch.Tensor, target_padded: torch.Tensor) -> torch.Tensor: ## Mod B
+               dec_init_state: torch.Tensor, target_padded: torch.Tensor) -> torch.Tensor:
         """Compute combined output vectors for a batch.
 
         :param enc_hiddens (Tensor): Hidden states (b, src_len, h*2), where
@@ -149,8 +143,7 @@ class NMT(nn.Module):
                                     tgt_len = maximum target sentence length, b = batch_size,  h = hidden size
         :rtype: torch.Tensor
         """
-        # return self.decoder(enc_hiddens, dec_init_state, target_padded)
-        return self.decoder(enc_hiddens, enc_masks, dec_init_state, target_padded) ## Mod B
+        return self.decoder(enc_hiddens, enc_masks, dec_init_state, target_padded)
 
     def beam_search(self, src_sent: List[str], beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
         """ Given a single source sentence, perform beam search, yielding translations in the target language.
@@ -168,7 +161,7 @@ class NMT(nn.Module):
         src_sents_var = self.src_vocab.to_input_tensor([src_sent], self.device)
 
         src_encodings, dec_init_vec = self.encode(src_sents_var, [len(src_sent)])
-        src_encodings_att_linear = self.decoder.att_projection(src_encodings) ## Mod B
+        src_encodings_att_linear = self.decoder.att_projection(src_encodings)
 
         h_tm1 = dec_init_vec
         att_tm1 = torch.zeros(1, self.hidden_size, device=self.device)
@@ -189,7 +182,7 @@ class NMT(nn.Module):
                                                      src_encodings.size(2))
             exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num, 
                                                                            src_encodings_att_linear.size(1), 
-                                                                           src_encodings_att_linear.size(2)) ## Mod B
+                                                                           src_encodings_att_linear.size(2))
 
 
             y_tm1 = torch.tensor([self.tgt_vocab[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=self.device)
@@ -197,10 +190,9 @@ class NMT(nn.Module):
 
             x = torch.cat([y_t_embed, att_tm1], dim=-1)
 
-            # h_t, att_t = self.decoder.step(x, h_tm1, exp_src_encodings)
             h_t, att_t = self.decoder.step(x, h_tm1,
                                 exp_src_encodings,
-                                exp_src_encodings_att_linear, enc_masks=None) ## Mod B
+                                exp_src_encodings_att_linear, enc_masks=None)
             
             ## TODO: Uncomment the line below if this is an LSTM
             h_t, c_t = h_t
@@ -271,7 +263,7 @@ class NMT(nn.Module):
         model = NMT(
             src_vocab=params['vocab']['source'],
             tgt_vocab=params['vocab']['target'],
-            d_rate=0.2, ## Mod B
+            d_rate=0.2, 
             **args
         )
         model.load_state_dict(params['state_dict'])

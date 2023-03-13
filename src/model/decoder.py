@@ -3,8 +3,7 @@ import torch.nn as nn
 from typing import Tuple
 
 class Decoder(nn.Module):
-    # def __init__(self, embed_size, hidden_size, target_embedding, device):
-    def __init__(self, embed_size, hidden_size, target_embedding, device, d_rate=None): ## Mod B
+    def __init__(self, embed_size, hidden_size, target_embedding, device, d_rate=None):
         """
         """
         super(Decoder, self).__init__()
@@ -14,7 +13,7 @@ class Decoder(nn.Module):
         self.embedding = target_embedding
         output_vocab_size = self.embedding.weight.size(0)
         self.softmax = nn.Softmax(dim=1)
-        self.d_rate = d_rate ## Mod B
+        self.d_rate = d_rate
 
         ### TODO:
         ###     self.decoder (RNN Cell with bias)
@@ -22,16 +21,13 @@ class Decoder(nn.Module):
         ###     self.target_vocab_projection (Linear Layer with no bias), called W_{vocab} above.
 
         self.decoder = nn.LSTMCell(embed_size + hidden_size, hidden_size, bias=True)
-        self.att_projection = nn.Linear(hidden_size*2, hidden_size, bias=False) ## Mod B
-        self.combined_output_projection = nn.Linear(hidden_size*3, hidden_size, bias=False) ## Mod B
-        # self.combined_output_projection = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.att_projection = nn.Linear(hidden_size*2, hidden_size, bias=False)
+        self.combined_output_projection = nn.Linear(hidden_size*3, hidden_size, bias=False)
         self.target_vocab_projection = nn.Linear(hidden_size, output_vocab_size, bias=False)
-        self.dropout = nn.Dropout(self.d_rate) ## Mod B
+        self.dropout = nn.Dropout(self.d_rate)
     
-    # def forward(self, enc_hiddens: torch.Tensor, dec_init_state: torch.Tensor, 
-    #             target_padded: torch.Tensor) -> torch.Tensor:
     def forward(self, enc_hiddens: torch.Tensor, enc_masks: torch.Tensor,
-                dec_init_state: torch.Tensor, target_padded: torch.Tensor) -> torch.Tensor: ## Mod B
+                dec_init_state: torch.Tensor, target_padded: torch.Tensor) -> torch.Tensor:
         """
         """
         # Chop off the <END> token for max length sentences.
@@ -61,14 +57,13 @@ class Decoder(nn.Module):
         ###         tensors shape (b, h), to a single tensor shape (tgt_len, b, h)
         ###         where tgt_len = maximum target sentence length, b = batch size, h = hidden size.
 
-        enc_hiddens_proj = self.att_projection(enc_hiddens) ## Mod B
+        enc_hiddens_proj = self.att_projection(enc_hiddens)
         Y = self.embedding(target_padded)
         
         for Y_t in torch.split(Y, split_size_or_sections=1):
             Y_t = Y_t.squeeze(0)
             Ybar_t = torch.cat([Y_t, o_prev], dim=-1)
-            # dec_state, o_t = self.step(Ybar_t, dec_state, enc_hiddens)
-            dec_state, o_t = self.step(Ybar_t, dec_state, enc_hiddens, enc_hiddens_proj, enc_masks) ## Mod B
+            dec_state, o_t = self.step(Ybar_t, dec_state, enc_hiddens, enc_hiddens_proj, enc_masks)
             combined_outputs.append(o_t)
             o_prev = o_t
 
@@ -76,14 +71,11 @@ class Decoder(nn.Module):
 
         return combined_outputs
     
-    # def step(self, Ybar_t: torch.Tensor,
-    #          dec_state: Tuple[torch.Tensor, torch.Tensor],
-    #          enc_hiddens: torch.Tensor) -> Tuple[Tuple, torch.Tensor, torch.Tensor]:
     def step(self, Ybar_t: torch.Tensor,
                  dec_state: Tuple[torch.Tensor, torch.Tensor],
                  enc_hiddens: torch.Tensor, 
                  enc_hiddens_proj: torch.Tensor,
-                 enc_masks: torch.Tensor) -> Tuple[Tuple, torch.Tensor, torch.Tensor]: ## Mod B
+                 enc_masks: torch.Tensor) -> Tuple[Tuple, torch.Tensor, torch.Tensor]:
         """ Compute one forward step of the LSTM decoder, including the attention computation.
 
         :param Ybar_t: Concatenated Tensor of [Y_t o_prev], with shape (b, e + h). The input for the decoder,
@@ -109,19 +101,17 @@ class Decoder(nn.Module):
 
         dec_state = self.decoder(Ybar_t, dec_state)
         (dec_hidden, dec_cell) = dec_state
-        e_t = torch.bmm(enc_hiddens_proj, dec_hidden.unsqueeze(2)).squeeze(2) ## Mod B
+        e_t = torch.bmm(enc_hiddens_proj, dec_hidden.unsqueeze(2)).squeeze(2)
 
         ### TODO:
         ###     1. Apply the combined output projection layer to h^dec_t to compute tensor V_t
         ###     2. Compute tensor O_t by applying the Tanh function.
 
-        alpha_t = self.softmax(e_t) ## Mod B
-        a_t = torch.bmm(alpha_t.unsqueeze(1), enc_hiddens).squeeze(1) ## Mod B
-        U_t = torch.cat([dec_hidden, a_t], 1) ## Mod B
-        V_t = self.combined_output_projection(U_t) ## Mod B
-        O_t = self.dropout(torch.tanh(V_t)) ## Mod B
-        # V_t = self.combined_output_projection(dec_hidden)
-        # O_t = torch.tanh(V_t)
+        alpha_t = self.softmax(e_t)
+        a_t = torch.bmm(alpha_t.unsqueeze(1), enc_hiddens).squeeze(1)
+        U_t = torch.cat([dec_hidden, a_t], 1)
+        V_t = self.combined_output_projection(U_t)
+        O_t = self.dropout(torch.tanh(V_t))
 
         combined_output = O_t
 
