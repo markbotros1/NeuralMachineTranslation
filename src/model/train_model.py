@@ -1,12 +1,10 @@
 import os
-import sys
 import torch
 from nmt import NMT
 from train_helpers import train_and_evaluate
 from sklearn.model_selection import train_test_split
-from data.data_processing import read_corpus, create_embed_matrix
-from data.vocab import Vocab
-
+from ..data.data_processing import read_corpus, create_embed_matrix
+from ..data.vocab import Vocab
 
 # Data file paths
 source_path = os.path.join(os.getcwd(), "data", "source.txt")
